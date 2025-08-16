@@ -1,0 +1,25 @@
+# Ignorar extensiones en cualquier carpeta
+*.Rproj.user
+*.Rhistory
+*.RData
+*.Ruserdata
+*.Rproj
+*.DS_Store
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.gz
+*.tex
+*.toc
+*.vrb
+
+# Ignorar carpetas específicas
+clase-01/pic/
+clase-02/pic/
+
+# Ignorar .Rproj.user en cualquier nivel
+**/.Rproj.user
+
+.Rproj.user
