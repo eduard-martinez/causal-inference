@@ -52,21 +52,37 @@ p_load(tidyverse, fixest, broom)
 ## load data
 data <- readRDS("data/datos.rds")
 
-##==: PRIMERA ETAPA:
-fs_fit <- lm("edu ~ black + married + smsa + age_qtrs + I(age_qtrs^2) + yob_f + qob_f:yob_f", data = data)
-summary(fs_fit)$coefficients[1:8,]
+## inspect data
+hist(data$edu)
+hist(data$age_qtrs)
 
+## generar dummy 
+data$decimales <- data$age_qtrs %% 1  
+data$z <- ifelse(data$decimales > 0.5, 1, 0)
+
+##==: PRIMERA ETAPA:
+fs_fit <- lm("edu ~ z + black + married + smsa", data = data)
+summary(fs_fit)
 
 ##==: SEGUNDA ETAPA:
+prediccion <- predict(fs_fit, data)
+data$edu_hat <- prediccion
 
+ss_fit <- lm("ln_wage ~ edu_hat + black + married + smsa", data = data)
+summary(ss_fit)
+
+##==: 2SLS
+model_iv <- feols(ln_wage ~ black + married + smsa | 0 | edu ~ z + black + married + smsa, data = data)
+summary(model_iv)
 
 ##==: FORMA REDUCIDA:
-
+red <- lm(ln_wage ~ z + black + married + smsa , data=data )
 
 ##==: ESTIMADOR DE WALD:
+gamma = -0.01906
+alpha = -0.083029
 
-
-
+gamma/alpha
 
 
 
