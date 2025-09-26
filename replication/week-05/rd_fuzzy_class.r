@@ -9,13 +9,17 @@ rm(list=ls())
 
 ## packages
 require(pacman)
-p_load(dplyr,ggplot2,rdrobust,fixest)
+p_load(dplyr,ggplot2,rdrobust,fixest,skimr)
 
 ## load data
 source("https://raw.githubusercontent.com/eduard-martinez/causal-inference/main/replication/week-05/data_rd.r")
+ls()
 
 ##==================
 ## 1. Check Data
+
+## skim
+skim(df)
 
 ## Initial plot
 ggplot(df, aes(calificacion , ingreso_usd)) +
@@ -26,6 +30,17 @@ theme_classic()
 ## Distribution
 ggplot(df, aes(calificacion)) +
 geom_density(color="grey40" , size=1 , alpha = 0.55) +
+geom_vline(xintercept = 75, linetype = "solid", linewidth = 0.8 , color="red") +
+theme_classic()
+
+## Salto en Tratamiento
+prop <- df %>%
+        group_by(calificacion) %>%
+        summarise(elegible=sum(elegible) , tratado=sum(tratado)) %>%
+        mutate(prop=tratado/elegible , prop=ifelse(is.nan(prop),0,prop)) 
+
+ggplot(prop , aes(x=calificacion , y=prop)) +
+geom_point(color="grey40" , size=1 , alpha = 0.55) +
 geom_vline(xintercept = 75, linetype = "solid", linewidth = 0.8 , color="red") +
 theme_classic()
 
