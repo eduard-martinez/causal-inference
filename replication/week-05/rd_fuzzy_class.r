@@ -17,65 +17,72 @@ source("https://raw.githubusercontent.com/eduard-martinez/causal-inference/main/
 ##==================
 ## 1. Check Data
 
-## plot
+## Initial plot
 ggplot(df, aes(calificacion , ingreso_usd)) +
-geom_point(color="grey40" , size=1.6 , alpha = 0.55) 
+geom_point(color="grey40" , size=1.6 , alpha = 0.55) +
+geom_vline(xintercept = 75, linetype = "solid", linewidth = 0.8 , color="red") +
+theme_classic()
 
+## Distribution
+ggplot(df, aes(calificacion)) +
+geom_density(color="grey40" , size=1 , alpha = 0.55) +
+geom_vline(xintercept = 75, linetype = "solid", linewidth = 0.8 , color="red") +
+theme_classic()
 
-  geom_line(data = gridL, aes(z, yhat), linewidth = 1.2, color = "black") +
-  geom_line(data = gridR, aes(z, yhat), linewidth = 1.2, color = "black") +
-  geom_vline(xintercept = z0, linetype = "dotted", linewidth = 0.8) +
-  coord_cartesian(xlim = xlim, ylim = ylim, expand = FALSE) +
-  labs(x = expression(z[i]), y = "Ingresos (log)") +
-  annotate("text", x = z0 + 0.02, y = (0 + 1.1)/2,
-           label = sprintf("\u03C4 = 0.2"),
-           hjust = 0, size = 4) +
-  theme_classic(base_size = 14) +
-  theme(panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8),
-        axis.ticks.length = unit(0.18, "cm"))
+## Tablas Cruzadas
+
 
 ##==================
 ## 2. ITT
 
 ## Plot
 rdplot(y = df$ingreso_usd , 
-       x = df$calificacion ,
-       c = 75 , 
-       p = 2,
-       h = 5, 
+       x = df$running ,
+       c = 0 , 
+       p = 1 ,
+       h = 10 ,
+       nbins = 2000 , 
        kernel = "triangular")
 
-## Estimation
-itt <- rdrobust( , x = x, fuzzy = D, c = corte, ,
-                p = 1, vce = "hc0", cluster = df$cod_mpio)
-print(frd)
+## OLS Estimation
+ols <- lm(ingreso_usd ~ running + elegible , data=df)
+summary(ols)
 
+## Estimation no parametrica
+itt <- rdrobust(y = df$ingreso_usd , 
+                x = df$running , 
+                c = 0 ,
+                q = 2 , 
+                cluster = df$cod_mpio)
+summary(itt)
 
+## Number of Obs. 1744 / 2660: observaciones usadas a cada lado con el h seleccionado.
+## Eff. Number of Obs. 695 / 736: “n efectivo” tras ponderar con el kernel (menos que el bruto).
+## Order est. (p) = 1: polinomio local lineal.
+## Order bias (q) = 2: orden usado para corregir sesgo (cuadrático).
+## BW est. (h) = 4.131: ancho de banda para estimar el salto.
+## BW bias (b) = 6.803: banda (más grande) para estimar términos de sesgo.
+## rho (h/b) = 0.607: razón entre ambas bandas (parámetro de RBC).
+## Unique Obs. 814 / 1221: valores únicos de la running variable a cada lado (informativo).
 
 ##==================
 ## 3. LATE
 
+## Primera Etapa
+fs <- lm(tratado ~ running + elegible , data=df)
+summary(fs)
+
+## Estimation 
 
 
-# --- 1) Estimación FRD (Wald local) ------------------------------------------
-y <- df$ingreso_usd
-x <- df$running
-D <- df$tratado
-corte <- 0
+## Estimation no parametrica
+itt <- rdrobust(y = df$ingreso_usd , 
+                x = df$running , 
+                c = 0 ,
+                q = 2 , 
+                cluster = df$cod_mpio)
+summary(itt)
 
-# FRD con corrección de sesgo (RBC). Sug: clúster por municipio
-
-cat("\n=== FRD: LATE estimado en el umbral ===\n")
-cat("tau_F =", round(frd$coef[1], 2), "  (SE RBC:", round(frd$se[1],2), ")\n")
-cat("Bandas (h_l, h_r) =", round(frd$bws[1,1:2], 3), "\n\n")
-
-# (Opcional) Forma reducida y 1ª etapa por separado, usando MISMAS bandas
-rf  <- rdrobust(y = y, x = x, c = corte, kernel = "triangular", p = 1, vce = "hc0",
-                h = frd$bws[1,1:2], cluster = df$cod_mpio)
-fs  <- rdrobust(y = D, x = x, c = corte, kernel = "triangular", p = 1, vce = "hc0",
-                h = frd$bws[1,1:2], cluster = df$cod_mpio)
-cat("Forma reducida (ΔY):", round(rf$coef[1],2), " | 1ª etapa (ΔPr(D=1)):", round(fs$coef[1],3), "\n")
-cat("Wald (ΔY/ΔD) con mismas h:", round(rf$coef[1]/fs$coef[1],2), "\n\n")
 
 # --- 2) Gráficos rdplot -------------------------------------------------------
 dir.create("plots", showWarnings = FALSE)

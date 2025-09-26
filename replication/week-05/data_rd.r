@@ -12,7 +12,7 @@ require(dplyr)
 n_mun   <- 203
 cupo    <- 10                      # top-10 elegibles por municipio
 minN    <- 18; maxN <- 25          # personas por municipio
-z0      <- 10                      # corte en el puesto 10 (running = orden - 10)
+z0      <- 75                      # Puntaje mkinimo
 
 ## Tamaños por municipio
 n_i <- sample(minN:maxN, n_mun, replace = TRUE)
@@ -36,8 +36,8 @@ df <- df %>%
       group_by(cod_mpio) %>%
       arrange(desc(calificacion), .by_group = TRUE) %>%
       mutate(orden = row_number(),
-             running = orden - z0,          
-             elegible = as.integer(calificacion>=75)) %>%
+             running = calificacion - z0,          
+             elegible = as.integer(calificacion>=z0)) %>%
       ungroup()
 
 ##====================================================
