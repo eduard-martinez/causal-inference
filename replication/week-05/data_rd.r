@@ -37,7 +37,7 @@ df <- df %>%
       arrange(desc(calificacion), .by_group = TRUE) %>%
       mutate(orden = row_number(),
              running = orden - z0,          
-             elegible = as.integer(orden <= cupo)) %>%
+             elegible = as.integer(calificacion>=75)) %>%
       ungroup()
 
 ##====================================================
