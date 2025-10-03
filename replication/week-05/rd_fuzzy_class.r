@@ -22,9 +22,9 @@ ls()
 skim(df)
 
 ## Initial plot
-ggplot(df, aes(calificacion , ingreso_usd)) +
+ggplot(df, aes(x=orden , y=edad)) +
 geom_point(color="grey40" , size=1.6 , alpha = 0.55) +
-geom_vline(xintercept = 75, linetype = "solid", linewidth = 0.8 , color="red") +
+geom_vline(xintercept=0 , linetype = "solid", linewidth = 0.8 , color="red") +
 theme_classic()
 
 ## Distribution
@@ -45,28 +45,28 @@ geom_vline(xintercept = 75, linetype = "solid", linewidth = 0.8 , color="red") +
 theme_classic()
 
 ## Tablas Cruzadas
-
+table(df$elegible , df$tratado)
 
 ##==================
 ## 2. ITT
+summary(rdbwselect(y = log(df$ingreso_usd) , 
+           x = df$running))
 
 ## Plot
-rdplot(y = df$ingreso_usd , 
+rdplot(y = log(df$ingreso_usd) , 
        x = df$running ,
-       c = 0 , 
-       p = 1 ,
-       h = 10 ,
-       nbins = 2000 , 
+       p = 2 ,
+       h = 3.794 ,
+       nbins = 1000 , 
        kernel = "triangular")
 
 ## OLS Estimation
-ols <- lm(ingreso_usd ~ running + elegible , data=df)
+ols <- lm(ingreso_usd ~ running + elegible , data=df , subset=running>-3.794 & running<3.794)
 summary(ols)
 
 ## Estimation no parametrica
 itt <- rdrobust(y = df$ingreso_usd , 
                 x = df$running , 
-                c = 0 ,
                 q = 2 , 
                 cluster = df$cod_mpio)
 summary(itt)
@@ -88,19 +88,18 @@ fs <- lm(tratado ~ running + elegible , data=df)
 summary(fs)
 
 ## Estimation 2SLS
-reg_2sls <- feols(ingreso_usd ~ 1 | 0 | tratado ~ elegible , data=df)
+reg_2sls <- feols(ingreso_usd ~ running | cod_mpio | tratado ~ elegible +running , data=df)
 summary(reg_2sls)
 
 ## Estimation no parametrica
 late <- rdrobust(y = df$ingreso_usd , 
                  x = df$running , 
                  fuzzy = df$tratado ,
-                 c = 0 ,
                  q = 2 , 
                  cluster = df$cod_mpio)
 summary(late)
 
-##==================
+##==================>
 ## 4. Validacion de Supuestos
 
 ## Densidad
