@@ -12,7 +12,7 @@ db <- import(file="https://raw.githubusercontent.com/eduard-martinez/causal-infe
 ## Check data
 
 ## subset data
-data <- db %>%
+data <- db %>% 
         subset(time %in% -6:6 & dist_rest>=-0.3 & dist_rest<=0.3) 
 
 ##==: 2. Calculo a mano
