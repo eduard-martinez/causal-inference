@@ -7,7 +7,7 @@ p_load(tidyverse , rio , lfe , fastDummies , broom)
 ##==: 1. Prepare data
 
 ## load data
-db <- import(file="slides/week-07/data/panel_mnz.rds" , setclass="data.table")
+db <- import(file="https://raw.githubusercontent.com/eduard-martinez/causal-inference/main/slides/week-07/data/panel_mnz.rds" , setclass="data.table")
 
 ## Check data
 
