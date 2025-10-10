@@ -1,142 +1,104 @@
 
-##==: initial setup
+## initial setup
 rm(list=ls())
-source("00_setup/00_packages.R")
-source("00_setup/01_function_reg.R")
+require(pacman)
+p_load(tidyverse , rio , lfe , fastDummies , broom)
 
-##==: load data
-panel <- import(file="05_join_db/output/panel_mnz.rds" , setclass="data.table") %>%
-         subset(time %in% -6:6 & dist_rest>=-1 & dist_rest<=1) %>%
-         mutate(treatment=case_when(dist_rest<=0~"Motorcycle Ban" , dist_rest>0~"Control"))
-table(panel$type_rest , panel$treatment)
-table(panel$type_rest , panel$treated)
+##==: 1. Prepare data
 
-##==: subset data
+## load data
+db <- import(file="slides/week-07/data/panel_mnz.rds" , setclass="data.table")
 
-##==: compute means of dependent variables
-mean_baq <- baq %>% 
-            subset(treated==0 & post==0) %>% 
-            summarise(total = round(mean(total_crime),3) ,
-                      hurto_per = round(mean(hurto_per),3) ,
-                      arma = round(mean(arma_crime),3))
+## Check data
 
-mean_bog <- bog %>% 
-            subset(treated==0 & post==0) %>% 
-            summarise(total = round(mean(total_crime),3) ,
-                      hurto_per = round(mean(hurto_per),3) ,
-                      arma = round(mean(arma_crime),3))
+## subset data
+data <- db %>%
+        subset(time %in% -6:6 & dist_rest>=-0.3 & dist_rest<=0.3) 
 
-mean_sol <- sol %>% 
-            subset(treated==0 & post==0) %>% 
-            summarise(total = round(mean(total_crime),3) ,
-                      hurto_per = round(mean(hurto_per),3) ,
-                      arma = round(mean(arma_crime),3))
+##==: 2. Calculo a mano
 
-mean_nev <- nev %>% 
-            subset(treated==0 & post==0) %>% 
-            summarise(total = round(mean(total_crime),3) ,
-                      hurto_per = round(mean(hurto_per),3) ,
-                      arma = round(mean(arma_crime),3))
+## Tratados en T=0
+t0 <- data %>% 
+      subset(treated==0 & post==0) %>% 
+      summarise(hurto = round(mean(hurto_per),3))
 
-mean_baq ; mean_bog ; mean_nev ; mean_sol
+## Tratados en T=1
 
-## n grids
-n_baq <- length(unique(baq$unique_id)) %>% format(big.mark = ",")
-n_bog <- length(unique(bog$unique_id)) %>% format(big.mark = ",")
-n_nev <- length(unique(nev$unique_id)) %>% format(big.mark = ",")
-n_sol <- length(unique(sol$unique_id)) %>% format(big.mark = ",")
 
-##==: main regressions: 
+## Controles en T=0
 
-## total crimes
-total_baq <- feols(data=baq , total_crime ~ post*treated | unique_id + time) 
-total_bog <- feols(data=bog , total_crime ~ post*treated | unique_id + time) 
-total_nev <- feols(data=nev , total_crime ~ post*treated | unique_id + time) 
-total_sol <- feols(data=sol , total_crime ~ post*treated | unique_id + time) 
 
-## hurto personas
-hp_baq <- feols(data=baq , hurto_per ~ post*treated | unique_id + time) 
-hp_bog <- feols(data=bog , hurto_per ~ post*treated | unique_id + time) 
-hp_nev <- feols(data=nev , hurto_per ~ post*treated | unique_id + time) 
-hp_sol <- feols(data=sol , hurto_per ~ post*treated | unique_id + time) 
+## Controles en T=1
 
-## armas in crime
-ar_baq <- feols(data=baq , arma_crime ~ post*treated | unique_id + time) 
-ar_bog <- feols(data=bog , arma_crime ~ post*treated | unique_id + time) 
-ar_nev <- feols(data=nev , arma_crime ~ post*treated | unique_id + time) 
-ar_sol <- feols(data=sol , arma_crime ~ post*treated | unique_id + time) 
 
-##==: make tables
 
-## modelo nulo
-nulo <- feols(data=panel , total_crime ~ 1) 
+##==: 3. Raw-Data
 
-## homicidios
-total <- etable(nulo,total_baq,nulo,total_bog,nulo,total_nev,nulo,total_sol,
-                digits=3,
-                drop="Constant" , fitstat=~n , se.below=T ,
-                tex=T , replace=T , view=F) %>% as.character()
+## plot
+mutate(data, time=ifelse(time>0,time-1,time)) %>%
+group_by(time,treated) %>% 
+summarise(var=mean(hurto_per , na.rm=T)) %>%
+ggplot(aes(x=time,y=var , color=as.factor(treated))) +
+geom_vline(xintercept=-0.5 , colour="#990000" , linetype="dashed" , alpha=1 , size=0.5) +
+geom_point(size=1 , show.legend=F) + 
+geom_line(size=0.6) +
+scale_color_manual(values=c("#999999", "#003366" , "#8B4513")) +
+theme_bw() + 
+scale_x_continuous(breaks=-6:6) + 
+guides(color = guide_legend(nrow=1 , title=NULL)) + 
+labs(x = "Months to restriction", y = "N. of Crimes per block (share)")
 
-## hurto personas
-hurto_per <- etable(nulo,hp_baq,nulo,hp_bog,nulo,hp_nev,nulo,hp_sol,
-                    digits=3,
-                    drop="Constant" , fitstat=~n , se.below=T ,
-                    tex=T , replace=T , view=F) %>% as.character()
+##==: 4. Estimación 
 
-## armas
-arma_per <- etable(nulo,ar_baq,nulo,ar_bog,nulo,ar_nev,nulo,ar_sol,
-                   digits=3,
-                   drop="Constant" , fitstat=~n , se.below=T ,
-                   tex=T , replace=T , view=F) %>% as.character()
+## tradicional
+dd_t <- felm(data=data , hurto_per ~ post*treated) 
+summary(dd_t)
 
-total ; hurto_per ; arma_per
+## TWFE
+dd_fe <- felm(data=data , hurto_per ~ post*treated | unique_id + time) 
+summary(dd_fe)
 
-##==: Prepare latex
+## TWFE + cluster
+dd_fe_c <- felm(data=data , hurto_per ~ post*treated | unique_id + time | 0 | unique_id) 
+summary(dd_fe_c)
 
-## clean 
-cat("\f")
+##==: 5. Estudio de Eventos
 
-## setup
-tbl <- "\\centering \\footnotesize \\setlength{\\tabcolsep}{4pt} \\renewcommand{\\arraystretch}{0.8}"
-tbl[2] <- "\\begin{tabular}{lcccccccc}"
-tbl[3] <- "\\toprule \\toprule"
-tbl[4] <- "& & \\multicolumn{3}{c}{\\textit{\\textbf{Male Passenger}}} & & 
-               \\multicolumn{1}{c}{\\textit{\\textbf{Passenger}}} & & 
-               \\multicolumn{1}{c}{\\textit{\\textbf{Full Motorcycle}}} \\\\
-               \\cmidrule(lr){3-5} \\cmidrule(lr){7-7} \\cmidrule(lr){9-9}
-           & & (1) &  & (2) &  & (3) &  & (4) \\\\"
-tbl[5] <- "\\midrule"
+## estimacion
+es_data <- data %>% 
+           mutate(time_t=time*treated) %>%
+           dummy_cols(select_columns="time_t" , remove_selected_columns=T) %>%
+           select(unique_id,hurto_per,time,treated,starts_with("time_t"),-`time_t_-1`,-`time_t_0`)
+names(es_data) <- gsub("-","_",names(es_data))
 
-## panel A
-tbl <- append(x=tbl , "\\multicolumn{9}{l}{\\textbf{Panel A: Number of total crimes}} \\\\")
-tbl <- append(x=tbl , values=c(total[9:10],"& & & & & & & & \\\\"))
-tbl <- append(x=tbl , values=paste0("\\textit{Control Group Mean (Dep. Var.)} & &",mean_baq$homi,"& &",mean_bog$homi,"& &",mean_nev$homi,"& &",mean_sol$homi,"\\\\ \\\\"))
+## model
+model <- paste0("hurto_per ~ ",paste0('time_t_' , c(-6:-2,1:6) , collapse=" + ")," | unique_id + time") %>% 
+         gsub("-","_",.) %>% as.formula()
+model 
 
-## panel B
-tbl <- append(x=tbl , "\\multicolumn{9}{l}{\\textbf{Panel B: Number of personal theft}} \\\\")
-tbl <- append(x=tbl , values=c(hurto_per[9:10],"& & & & & & & & \\\\")) 
-tbl <- append(x=tbl , values=paste0("\\textit{Control Group Mean (Dep. Var.)} & &",mean_baq$hurto_per,"& &",mean_bog$hurto_per,"& &",mean_nev$hurto_per,"& &",mean_sol$hurto_per,"\\\\ \\\\"))
+## estimation
+tb <- felm(data=es_data , formula=model) %>% 
+      broom::tidy() %>% 
+      select(term,estimate,std.error) %>%
+      mutate(beta=ifelse(str_detect(term,"time_t"),"Motorcycle Ban",NA) ,
+             time=gsub("time_t_","",term) %>% gsub("_","-",.) %>% as.numeric(),
+             time=ifelse(time>0,time-1,time), 
+             ci_lower=estimate-1.96*std.error,
+             ci_upper=estimate+1.96*std.error) 
+tb
 
-## panel C
-tbl <- append(x=tbl , "\\multicolumn{9}{l}{\\textbf{Panel C: Number of armed assaults and robberies}} \\\\")
-tbl <- append(x=tbl , values=c(arma_per[9:10],"& & & & & & & & \\\\")) 
-tbl <- append(x=tbl , values=paste0("\\textit{Control Group Mean (Dep. Var.)} & &",mean_baq$arma,"& &",mean_bog$arma,"& &",mean_nev$arma,"& &",mean_sol$arma,"\\\\"))
+## plot
+ggplot(tb , aes(x=time , y=estimate , color=beta , fill=beta)) +
+geom_hline(yintercept=0 , colour="#000000" , linetype="solid" , alpha=1 , size=0.5) +
+geom_vline(xintercept=-1 , colour="#990000" , linetype="dashed" , alpha=1 , size=0.5) +
+scale_color_manual(values=c("Motorcycle Ban"="#003366")) + 
+scale_fill_manual(values=c("Motorcycle Ban"="#003366")) +
+geom_errorbar(width=.05, aes(ymin=ci_lower , ymax=ci_upper) , show.legend=F) + 
+geom_point(shape=21 , size=2 , show.legend=F) +
+scale_x_continuous(breaks = -6:5) +
+theme_bw()  +
+labs(y="Effect Size" , x="Months to Restriction" , legend=NULL , color="" , fill="")
 
-## replace names
-tbl <- str_replace_all(tbl,"post \\$\\\\times\\$ treated","Motorcycle Ban x Post")
 
-## add complement
-tbl <- append(x=tbl , values=c("\\midrule"))
-tbl <- append(x=tbl , values="\\textit{Block F.E.} & & \\checkmark & & \\checkmark &  & \\checkmark & & \\checkmark \\\\") 
-tbl <- append(x=tbl , values="\\textit{Month F.E.} & & \\checkmark & & \\checkmark &  & \\checkmark & & \\checkmark \\\\") 
-tbl <- append(x=tbl , values=paste0("\\textit{N. Blocks} & &",n_baq,"& &",n_bog,"& &",n_nev,"& &",n_sol,"\\\\"))
-tbl <- str_replace_all(string=tbl,"Observations","\\\\textit{Observations}")
-tbl <- append(x=tbl , values=total[17]) %>% str_remove_all("148,164")
 
-## replace complement
-tbl <- append(x=tbl , values="\\bottomrule \\bottomrule")
-tbl <- append(x=tbl , values="\\end{tabular}")
-tbl %>% str_remove_all("  ")
 
-## export
-writeLines(tbl , "10_overleaf/tables/reg/dd_type_crime.tex")
