@@ -9,6 +9,10 @@ rm(list=ls())
 require(pacman)
 p_load(tidyverse , rio , MatchIt , broom , cobalt)
 
+##===========================##
+## Propensity Score Matching ##
+##===========================##
+
 ## load data
 base_psm <- import("data/base_psm.rds")
 
@@ -67,8 +71,64 @@ att_psm <- matched_psm %>%
            summarise(ATT = diff(mean_ingreso))
 att_psm
 
+##==================================##
+## Propensity Score Matching + DinD ##
+##==================================##
 
+## load data
+base_panel <- import("data/base_panel.rds")
 
+##==: 1. Calcular cambio individual (ΔY)
+delta <- base_panel %>%
+         pivot_wider(names_from = year, values_from = ingreso, names_prefix = "t") %>%
+         mutate(delta = t1 - t0) %>%
+         select(id, beneficiario, puntaje_saber11, estrato, colegio_privado, mujer, delta)
+
+##==: 2. Emparejar por PSM sobre los observables (mismo método que antes)
+m_psm_did <- matchit(formula = beneficiario ~ puntaje_saber11 + estrato + colegio_privado + mujer,
+                     data = delta,
+                     method = "nearest",
+                     distance = "logit",
+                     replace = TRUE,
+                     caliper = 0.2,
+                     discard = "both")
+
+## Diagnóstico
+summary(m_psm_did)
+
+##==: 3. Soporte común (opcional: plot con ggplot)
+delta$p_treated <- m_psm_did$distance
+
+delta %>%
+  mutate(grupo = ifelse(beneficiario == 1, "Tratado", "Control")) %>%
+  ggplot(aes(x = p_treated, fill = grupo)) +
+  geom_density(alpha = 0.35) +
+  labs(title = "Propensity Score (PSM-DiD)",
+       subtitle = "Distribución de la probabilidad de ser beneficiario (antes del matching)",
+       x = "Propensity score (probabilidad estimada de tratamiento)",
+       y = "Densidad") +
+  theme_minimal(base_size = 12)
+
+##==: 4. Base emparejada
+matched_did <- match.data(m_psm_did)
+
+matched_did %>%
+  mutate(grupo = ifelse(beneficiario == 1, "Tratado", "Control")) %>%
+  ggplot(aes(x = distance, fill = grupo)) +
+  geom_density(alpha = 0.35) +
+  labs(title = "Propensity Score (PSM-DiD)",
+       subtitle = "Distribución posterior al matching",
+       x = "Propensity score (probabilidad estimada de tratamiento)",
+       y = "Densidad") +
+  theme_minimal(base_size = 12)
+
+##==: 5. Estimar ATT (sobre el cambio ΔY)
+att_psm_did <- matched_did %>%
+  group_by(beneficiario) %>%
+  summarise(mean_delta = mean(delta)) %>%
+  summarise(ATT_DID = diff(mean_delta))
+
+att_psm_did
 
 
 
@@ -105,6 +165,5 @@ att_psm_did
 
 
 
-## load data
-base_panel <- import("data/base_panel.rds")
+
 
