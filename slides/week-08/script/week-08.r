@@ -7,14 +7,15 @@
 ## initial setup
 rm(list=ls())
 require(pacman)
-p_load(tidyverse , rio , MatchIt , broom , cobalt)
+p_load(tidyverse , rio , MatchIt , broom)
 
 ##===========================##
 ## Propensity Score Matching ##
 ##===========================##
 
 ## load data
-base_psm <- import("data/base_psm.rds")
+base_psm <- import("https://raw.githubusercontent.com/eduard-martinez/causal-inference/main/slides/week-08/data/base_psm.rds") %>%
+            as_tibble()
 
 ##==: 1. Estimar y evaluar el soporte común
 
@@ -76,7 +77,8 @@ att_psm
 ##==================================##
 
 ## load data
-base_panel <- import("data/base_panel.rds")
+base_panel <- import("https://raw.githubusercontent.com/eduard-martinez/causal-inference/main/slides/week-08/data/base_panel.rds") %>%
+              as_tibble()
 
 ##==: 1. Calcular cambio individual (ΔY)
 delta <- base_panel %>%
@@ -89,7 +91,7 @@ m_psm_did <- matchit(formula = beneficiario ~ puntaje_saber11 + estrato + colegi
                      data = delta,
                      method = "nearest",
                      distance = "logit",
-                     replace = TRUE,
+                     replace = F,
                      caliper = 0.2,
                      discard = "both")
 
@@ -100,70 +102,35 @@ summary(m_psm_did)
 delta$p_treated <- m_psm_did$distance
 
 delta %>%
-  mutate(grupo = ifelse(beneficiario == 1, "Tratado", "Control")) %>%
-  ggplot(aes(x = p_treated, fill = grupo)) +
-  geom_density(alpha = 0.35) +
-  labs(title = "Propensity Score (PSM-DiD)",
-       subtitle = "Distribución de la probabilidad de ser beneficiario (antes del matching)",
-       x = "Propensity score (probabilidad estimada de tratamiento)",
-       y = "Densidad") +
-  theme_minimal(base_size = 12)
+mutate(grupo = ifelse(beneficiario == 1, "Tratado", "Control")) %>%
+ggplot(aes(x = p_treated, fill = grupo)) +
+geom_density(alpha = 0.35) +
+labs(title = "Propensity Score (PSM-DiD)",
+     subtitle = "Distribución de la probabilidad de ser beneficiario (antes del matching)",
+     x = "Propensity score (probabilidad estimada de tratamiento)",
+     y = "Densidad") +
+theme_minimal(base_size = 12)
 
 ##==: 4. Base emparejada
+
+## get base
 matched_did <- match.data(m_psm_did)
 
 matched_did %>%
-  mutate(grupo = ifelse(beneficiario == 1, "Tratado", "Control")) %>%
-  ggplot(aes(x = distance, fill = grupo)) +
-  geom_density(alpha = 0.35) +
-  labs(title = "Propensity Score (PSM-DiD)",
-       subtitle = "Distribución posterior al matching",
-       x = "Propensity score (probabilidad estimada de tratamiento)",
-       y = "Densidad") +
-  theme_minimal(base_size = 12)
+mutate(grupo = ifelse(beneficiario == 1, "Tratado", "Control")) %>%
+ggplot(aes(x = distance, fill = grupo)) +
+geom_density(alpha = 0.35) +
+labs(title = "Propensity Score (PSM-DiD)",
+     subtitle = "Distribución posterior al matching",
+     x = "Propensity score (probabilidad estimada de tratamiento)",
+     y = "Densidad") +
+theme_minimal(base_size = 12)
 
 ##==: 5. Estimar ATT (sobre el cambio ΔY)
 att_psm_did <- matched_did %>%
-  group_by(beneficiario) %>%
-  summarise(mean_delta = mean(delta)) %>%
-  summarise(ATT_DID = diff(mean_delta))
+               group_by(beneficiario) %>%
+               summarise(mean_delta = mean(delta)) %>%
+               summarise(ATT_DID = diff(mean_delta))
 
-att_psm_did
-
-
-
-
-
-
-# ------------------------------------------------------------
-# 4. Calcular diferencias individuales
-# ------------------------------------------------------------
-delta <- base_panel %>%
-  pivot_wider(names_from = year, values_from = ingreso, names_prefix = "t") %>%
-  mutate(delta = t1 - t0)
-
-# Matching sobre la diferencia (PSM-DiD)
-m_psm_did <- matchit(
-  beneficiario ~ puntaje_saber11 + estrato + colegio_privado + mujer,
-  data = delta,
-  method = "nearest",
-  distance = "logit"
-)
-
-summary(m_psm_did)
-
-matched_did <- match.data(m_psm_did)
-
-# Estimador ATT PSM-DiD
-att_psm_did <- matched_did %>%
-  group_by(beneficiario) %>%
-  summarise(mean_delta = mean(delta)) %>%
-  summarise(ATT_DID = diff(mean_delta))
-
-att_psm_did
-
-
-
-
-
+att_psm ; att_psm_did
 
