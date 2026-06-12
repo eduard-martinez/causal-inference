@@ -18,6 +18,12 @@
 # Ignorar carpetas específicas
 clase-01/pic/
 clase-02/pic/
+final-project/code/
+final-project/input/
+final-project/older/
+
+# Configuración local de Claude Code
+.claude/settings.local.json
 
 # Ignorar .Rproj.user en cualquier nivel
 **/.Rproj.user
